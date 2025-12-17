@@ -363,7 +363,7 @@ process annotate_autopvs1 {
 
 process select_clinvar {
     tag "clinvar"
-    container 'pgc-images.sbgenomics.com/diskin-lab/autogvp:v1.0.3'    
+    container 'pgc-images.sbgenomics.com/diskin-lab/autogvp:v1.0.5'    
     containerOptions = { "--bind ${params.autogvp_dir}:/home/rstudio/AutoGVP" }
 
     output:
@@ -382,7 +382,7 @@ process select_clinvar {
 
 process run_autogvp {
     tag "autogvp"
-    container 'pgc-images.sbgenomics.com/diskin-lab/autogvp:v1.0.3'    
+    container 'pgc-images.sbgenomics.com/diskin-lab/autogvp:v1.0.5'    
     containerOptions = { "--bind ${params.autogvp_dir}:/home/rstudio/AutoGVP" }
     publishDir 'results', mode: 'copy'
    
