@@ -16,7 +16,7 @@ process extract_fastq {
     
     script:
     """
-    samtools sort -n --reference ${params.reference} -O BAM \
+    samtools sort -n --reference ${params.reference_in} -O BAM \
         -o ${sample}.sorted.bam -@ ${task.cpus} ${cram} 
     samtools fastq -@ ${task.cpus} -1 ${sample}_1.fastq.gz \
         -2 ${sample}_2.fastq.gz ${sample}.sorted.bam > /dev/null 2>&1
