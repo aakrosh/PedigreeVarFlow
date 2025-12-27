@@ -1,0 +1,89 @@
+# ----------------------------------------------------------------------------
+# REFERENCE GENOME
+# ----------------------------------------------------------------------------
+# Path to reference genome FASTA file (must be indexed with .fai) that will
+# be aligned to
+reference: '/path/to/reference/genome.fasta'
+
+# Genome assembly version (GRCh38 or hg19)
+genome_assembly: 'GRCh38'
+
+# Path to a reference file that was used in the input CRAMs
+reference_in: '/path/to/reference/genome.fasta'
+
+# ----------------------------------------------------------------------------
+# INPUT FILES
+# ----------------------------------------------------------------------------
+# CSV file containing sample information and CRAM file locations
+# Format: sample_id,cram_path,crai_path,family_id,affected_status
+samplesheet: '/path/to/samplesheet.csv'
+
+# BED file defining target regions for variant calling (e.g., exome capture regions)
+target_regions: '/path/to/target_regions.bed'
+
+# BED file with regions to exclude from variant analysis (e.g., low complexity)
+exclusion_bed: '/path/to/exclusion_regions.bed'
+
+# Pedigree file in PED format (family relationships)
+# Format: Family_ID Individual_ID Paternal_ID Maternal_ID Sex Phenotype
+# Sex: (1=male; 2=female; other=unknown)
+# Phenotype: 1 unaffected, 2:affected
+pedigree: '/path/to/pedigree.ped'
+
+# File containing Human Phenotype Ontology (HPO) terms for proband
+# One HPO term per line (e.g., HP:0001250 for Seizure)
+phenotype_file: '/path/to/hpo_terms.txt'
+
+# Proband identifier (must match Individual_ID in pedigree file)
+proband: 'PROBAND_ID'
+
+# ----------------------------------------------------------------------------
+# TOOL PATHS & CONFIGURATIONS
+# ----------------------------------------------------------------------------
+
+## VariantQC
+# Path to DISCVRSeq JAR file for quality control
+variantqc_jar: '/path/to/DISCVRSeq.jar'
+
+## Exomiser
+# Path to Exomiser CLI JAR file
+exomiser_cli_jar: '/path/to/exomiser-cli.jar'
+
+# Exomiser configuration application properties file
+exomiser_config: '/path/to/exomiser_config.yml'
+
+## VEP (Variant Effect Predictor)
+# VEP cache directory containing reference data
+vep_cachedir: '/path/to/vep/cache'
+
+## ANNOVAR
+# ANNOVAR installation directory
+annovar_dir: '/path/to/annovar'
+
+# ANNOVAR database directory (contains humandb/)
+annovar_database: '/path/to/annovar/humandb'
+
+## InterVar
+# InterVar database directory
+intervar_database: '/path/to/intervar/database'
+
+## AutoPVS1
+# AutoPVS1 data files directory
+autopvs1_data: '/path/to/autopvs1/data'
+
+# AutoPVS1 configuration file
+autopvs1_config: '/path/to/autopvs1_config.json'
+
+## AutoGVP
+# AutoGVP installation directory
+autogvp_dir: '/path/to/autogvp'
+
+## Apptainer
+apptainer_cache_dir: '/path/to/apptainer/cache'
+
+## Cluster queue name
+queue: 'standard'
+
+## Cluster options e.g., account name
+clusterOptions: '-A '
+

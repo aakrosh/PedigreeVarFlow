@@ -7,7 +7,7 @@ This Nextflow workflow takes as input CRAM files from related individuals that i
 
 ## Running the workflow
 ```{bash}
-nextflow -c nextflow.config -profile uva -params-file params.yml run aakrosh/ped_exome_variant -resume 
+nextflow -c nextflow.config run -profile uva -params-file params.yml aakrosh/PedigreeVarFlow -resume
 ```
 
 ## Notes
