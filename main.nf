@@ -529,6 +529,26 @@ process annotate_vep {
 process annotate_annovar {
     tag "Annovar"
 
+    // NOTE: ANNOVAR requires local installation (not containerized)
+    //
+    // ANNOVAR cannot be containerized due to licensing restrictions.
+    // You must register and download from: https://annovar.openbioinformatics.org/
+    //
+    // Required setup:
+    //   1. Download ANNOVAR and extract to a directory
+    //   2. Set params.annovar_dir to the installation directory
+    //   3. Download required databases:
+    //      perl annotate_variation.pl -buildver hg38 -downdb -webfrom annovar gnomad211_exome humandb/
+    //      perl annotate_variation.pl -buildver hg38 -downdb -webfrom annovar gnomad211_genome humandb/
+    //   4. Set params.annovar_database to the humandb directory
+    //
+    // Required files:
+    //   - ${params.annovar_dir}/table_annovar.pl
+    //   - ${params.annovar_database}/hg38_gnomad211_exome.txt (or hg19 version)
+    //   - ${params.annovar_database}/hg38_gnomad211_genome.txt (or hg19 version)
+    //
+    // This process runs on the compute node but uses locally installed ANNOVAR.
+
     input:
     tuple val(sample), val(type), path(vcf)
 
@@ -713,7 +733,7 @@ workflow {
     leftalign_split(zipped_variants_channel)
         .set { standardize_channel }
 
-    // bzgip and index the variants
+    // bgzip and index the variants
     bgzip_index_standard(standardize_channel)
         .set { zipped_standard_channel }
 
