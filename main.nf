@@ -65,9 +65,15 @@ process validate_inputs {
     ref_in = Path("${reference_in}")
     if not ref_in.exists():
         error_exit(f"Input reference not found: {ref_in}")
+
+    # Note: .fai not required for samtools sort -n (name-based sorting)
     ref_in_fai = Path(f"{ref_in}.fai")
     if not ref_in_fai.exists():
-        error_exit(f"Input reference index (.fai) not found: {ref_in_fai}")
+        warning(f"Input reference index (.fai) not found: {ref_in_fai}\\n" +
+                f"       This is OK for name-sorting, but may be needed for other operations")
+    else:
+        print(f"   [OK] Input reference index found")
+
     print(f"   [OK] Input reference: {ref_in.name}")
 
     # Check samplesheet
