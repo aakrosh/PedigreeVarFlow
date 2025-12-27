@@ -251,7 +251,8 @@ process align_fastq {
     // Split resources: more CPUs to BWA (bottleneck), rest to sort
     def bwa_threads = Math.max(1, task.cpus - 4)
     def sort_threads = Math.min(4, Math.max(1, task.cpus - bwa_threads))
-    def sort_mem = "${Math.max(1, Math.floor(task.memory.toGiga() / sort_threads - 2))}G"
+    def sort_mem_gb = Math.max(1, Math.floor(task.memory.toGiga() / sort_threads - 2)).toInteger()
+    def sort_mem = "${sort_mem_gb}G"
 
     """
     mkdir -p tmp_sort
@@ -388,7 +389,8 @@ process prioritize_variants {
     
     script:
     // Dynamically allocate memory based on SLURM allocation
-    def max_mem = task.memory ? "-Xmx${task.memory.toMega() - 2048}m" : "-Xmx4g"
+    def max_mem_mb = task.memory ? (task.memory.toMega() - 2048).toInteger() : 4096
+    def max_mem = "-Xmx${max_mem_mb}m"
 
     """
     # Create an Exomiser analysis YAML configuration file
