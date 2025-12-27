@@ -174,6 +174,9 @@ process prioritize_variants {
     path("exomiser_results/prioritized.vcf.gz.tbi")
     
     script:
+    // Dynamically allocate memory based on SLURM allocation
+    def max_mem = task.memory ? "-Xmx${task.memory.toMega() - 2048}m" : "-Xmx4g"
+
     """
     # Create an Exomiser analysis YAML configuration file
     cat > analysis.yml << EOF
@@ -246,9 +249,9 @@ process prioritize_variants {
     
     # Create the output directory
     mkdir -p exomiser_results
-    
-    # Run Exomiser CLI
-    java -Xms2g -Xmx4g -jar ${params.exomiser_cli_jar} \
+
+    # Run Exomiser CLI with dynamic memory allocation
+    java -Xms2g ${max_mem} -jar ${params.exomiser_cli_jar} \
         --analysis analysis.yml \
         --spring.config.location=${params.exomiser_config}
     """
