@@ -25,24 +25,35 @@ process extract_fastq {
 
 process align_fastq {
     tag "$sample"
-    container "aakrosh/bwa-suite:alpine"  
+    container "aakrosh/bwa-suite:alpine"
     publishDir 'results', mode: 'copy'
 
     input:
     tuple val(sample), path(fq1), path(fq2)
-    
+
     output:
     tuple val(sample), path("${sample}.bam"), path("${sample}.bam.bai")
 
     script:
+    // Split resources: more CPUs to BWA (bottleneck), rest to sort
+    def bwa_threads = Math.max(1, task.cpus - 4)
+    def sort_threads = Math.min(4, Math.max(1, task.cpus - bwa_threads))
+    def sort_mem = "${Math.max(1, Math.floor(task.memory.toGiga() / sort_threads - 2))}G"
+
     """
-    bwa mem -t ${task.cpus} -Y \
+    mkdir -p tmp_sort
+
+    bwa mem -t ${bwa_threads} -Y \
       -R \"@RG\\tID:${sample}\\tSM:${sample}\\tPL:illumina\" \
       -K 100000000 ${params.reference} ${fq1} ${fq2} \
     | samblaster --addMateTags \
-    | samtools view -b -h - \
-    | samtools sort -@ ${task.cpus} -O BAM -o ${sample}.bam -
-    samtools index ${sample}.bam
+    | samtools view -u -h - \
+    | samtools sort -@ ${sort_threads} -m ${sort_mem} \
+        -T tmp_sort/${sample} -O BAM -o ${sample}.bam -
+
+    samtools index -@ ${task.cpus} ${sample}.bam
+
+    rm -rf tmp_sort
     """
 }
 
