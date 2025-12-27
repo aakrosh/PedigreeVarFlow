@@ -1,8 +1,221 @@
 // Description: Run a workflow that aligns a CRAM file using BWA-MEM.
 nextflow.enable.dsl = 2
-include { bgzip_index_variants as bgzip_index_raw; 
+include { bgzip_index_variants as bgzip_index_raw;
           bgzip_index_variants as bgzip_index_standard;
           bgzip_index_variants as bgzip_index_vep } from "./modules/index"
+
+process validate_inputs {
+    tag "Input Validation"
+    executor 'local'
+
+    input:
+    path samplesheet
+    path reference
+    path reference_in
+    path pedigree
+    path phenotype
+    path target_regions
+    path exclusion_bed
+
+    output:
+    val true
+
+    script:
+    """
+    #!/usr/bin/env python3
+    import sys
+    import csv
+    from pathlib import Path
+
+    def error_exit(message):
+        print(f"ERROR: {message}", file=sys.stderr)
+        sys.exit(1)
+
+    def warning(message):
+        print(f"WARNING: {message}", file=sys.stderr)
+
+    print("=" * 70)
+    print("PedigreeVarFlow Input Validation")
+    print("=" * 70)
+
+    # Check reference genome
+    print("\\n[1/7] Validating reference genome...")
+    ref = Path("${reference}")
+    if not ref.exists():
+        error_exit(f"Reference genome not found: {ref}")
+
+    # Check for reference index (.fai)
+    fai = Path(f"{ref}.fai")
+    if not fai.exists():
+        error_exit(f"Reference index (.fai) not found: {fai}\\n" +
+                   f"       Create with: samtools faidx {ref}")
+
+    # Check for BWA index
+    bwa_index = Path(f"{ref}.bwt")
+    if not bwa_index.exists():
+        error_exit(f"BWA index not found: {bwa_index}\\n" +
+                   f"       Create with: bwa index {ref}")
+
+    print(f"   [OK] Reference: {ref.name}")
+    print(f"   [OK] Reference index found")
+    print(f"   [OK] BWA index found")
+
+    # Check input reference (for CRAM)
+    print("\\n[2/7] Validating input reference (for CRAM)...")
+    ref_in = Path("${reference_in}")
+    if not ref_in.exists():
+        error_exit(f"Input reference not found: {ref_in}")
+    ref_in_fai = Path(f"{ref_in}.fai")
+    if not ref_in_fai.exists():
+        error_exit(f"Input reference index (.fai) not found: {ref_in_fai}")
+    print(f"   [OK] Input reference: {ref_in.name}")
+
+    # Check samplesheet
+    print("\\n[3/7] Validating samplesheet...")
+    samplesheet = Path("${samplesheet}")
+    if not samplesheet.exists():
+        error_exit(f"Samplesheet not found: {samplesheet}")
+
+    samples = []
+    with open(samplesheet) as f:
+        reader = csv.DictReader(f)
+
+        # Check required columns
+        if 'sample' not in reader.fieldnames:
+            error_exit("Samplesheet missing required column: 'sample'")
+        if 'cram_location' not in reader.fieldnames:
+            error_exit("Samplesheet missing required column: 'cram_location'")
+
+        # Validate each row
+        for i, row in enumerate(reader, start=2):
+            sample = row.get('sample', '').strip()
+            cram_path = row.get('cram_location', '').strip()
+
+            if not sample:
+                error_exit(f"Empty sample name at line {i}")
+
+            if sample in samples:
+                error_exit(f"Duplicate sample ID '{sample}' at line {i}")
+            samples.append(sample)
+
+            if not cram_path:
+                error_exit(f"Empty CRAM path for sample '{sample}' at line {i}")
+
+            # Check if CRAM file exists (only if not a URL)
+            if not cram_path.startswith(('http://', 'https://', 's3://', 'gs://')):
+                cram = Path(cram_path)
+                if not cram.exists():
+                    error_exit(f"CRAM file not found for sample '{sample}': {cram_path}")
+
+                # Check for CRAM index
+                crai = Path(f"{cram_path}.crai")
+                if not crai.exists():
+                    warning(f"CRAM index not found for '{sample}': {crai}")
+
+    if not samples:
+        error_exit("Samplesheet is empty (no samples found)")
+
+    print(f"   [OK] Samplesheet valid")
+    print(f"   [OK] Found {len(samples)} samples: {', '.join(samples[:5])}" +
+          (f" ..." if len(samples) > 5 else ""))
+
+    # Check pedigree file
+    print("\\n[4/7] Validating pedigree file...")
+    pedigree = Path("${pedigree}")
+    if not pedigree.exists():
+        error_exit(f"Pedigree file not found: {pedigree}")
+
+    pedigree_samples = set()
+    with open(pedigree) as f:
+        for i, line in enumerate(f, start=1):
+            if line.startswith('#'):
+                continue
+            fields = line.strip().split()
+            if len(fields) < 6:
+                error_exit(f"Pedigree line {i} has fewer than 6 columns")
+
+            # Extract individual ID (column 2)
+            individual = fields[1]
+            pedigree_samples.add(individual)
+
+            # Validate sex (column 5)
+            sex = fields[4]
+            if sex not in ('0', '1', '2'):
+                warning(f"Non-standard sex value '{sex}' for {individual} (expected 0/1/2)")
+
+            # Validate phenotype (column 6)
+            phenotype_val = fields[5]
+            if phenotype_val not in ('0', '1', '2', '-9'):
+                warning(f"Non-standard phenotype '{phenotype_val}' for {individual}")
+
+    print(f"   [OK] Pedigree file valid")
+    print(f"   [OK] Found {len(pedigree_samples)} individuals in pedigree")
+
+    # Check proband is in pedigree
+    proband = "${params.proband}"
+    if proband and proband not in pedigree_samples:
+        error_exit(f"Proband '{proband}' not found in pedigree file")
+    if proband:
+        print(f"   [OK] Proband '{proband}' found in pedigree")
+
+    # Check samplesheet vs pedigree consistency
+    print("\\n[5/7] Checking samplesheet vs pedigree consistency...")
+    sample_set = set(samples)
+
+    # Samples in samplesheet but not in pedigree
+    missing_in_pedigree = sample_set - pedigree_samples
+    if missing_in_pedigree:
+        warning(f"Samples in samplesheet but not in pedigree: {missing_in_pedigree}")
+
+    # Samples in pedigree but not in samplesheet
+    missing_in_samplesheet = pedigree_samples - sample_set
+    if missing_in_samplesheet:
+        warning(f"Samples in pedigree but not in samplesheet: {missing_in_samplesheet}")
+
+    if not missing_in_pedigree and not missing_in_samplesheet:
+        print(f"   [OK] All samples match between samplesheet and pedigree")
+
+    # Check phenotype file
+    print("\\n[6/7] Validating phenotype file...")
+    phenotype = Path("${phenotype}")
+    if not phenotype.exists():
+        error_exit(f"Phenotype file not found: {phenotype}")
+
+    hpo_terms = []
+    with open(phenotype) as f:
+        for i, line in enumerate(f, start=1):
+            term = line.strip()
+            if not term:
+                continue
+            if not term.startswith('HP:'):
+                warning(f"Line {i}: '{term}' doesn't look like HPO term (expected HP:XXXXXXX)")
+            hpo_terms.append(term)
+
+    if not hpo_terms:
+        error_exit("Phenotype file is empty (no HPO terms found)")
+
+    print(f"   [OK] Phenotype file valid")
+    print(f"   [OK] Found {len(hpo_terms)} HPO terms")
+
+    # Check BED files
+    print("\\n[7/7] Validating BED files...")
+    target = Path("${target_regions}")
+    if not target.exists():
+        error_exit(f"Target regions BED file not found: {target}")
+
+    exclusion = Path("${exclusion_bed}")
+    if not exclusion.exists():
+        error_exit(f"Exclusion BED file not found: {exclusion}")
+
+    print(f"   [OK] Target regions BED: {target.name}")
+    print(f"   [OK] Exclusion BED: {exclusion.name}")
+
+    # Success
+    print("\\n" + "=" * 70)
+    print("SUCCESS: All validation checks passed!")
+    print("=" * 70)
+    """
+}
 
 process extract_fastq {
     tag "$sample"
@@ -448,6 +661,17 @@ process multiqc {
 }
 
 workflow {
+    // Validate all inputs before starting the pipeline
+    validate_inputs(
+        file(params.samplesheet),
+        file(params.reference),
+        file(params.reference_in),
+        file(params.pedigree),
+        file(params.phenotype_file),
+        file(params.target_regions),
+        file(params.exclusion_bed)
+    )
+
     Channel.fromPath(params.samplesheet)
         .splitCsv(header: true)
         .map { row -> tuple(row.sample, file(row.cram_location)) }
