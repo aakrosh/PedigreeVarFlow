@@ -11,6 +11,8 @@ process validate_inputs {
     input:
     path samplesheet
     path reference
+    path reference_fai
+    path reference_bwa_index
     path reference_in
     path pedigree
     path phenotype
@@ -693,6 +695,8 @@ workflow {
     validate_inputs(
         file(params.samplesheet),
         file(params.reference),
+        file("${params.reference}.fai"),
+        file("${params.reference}.bwt"),
         file(params.reference_in),
         file(params.pedigree),
         file(params.phenotype_file),
