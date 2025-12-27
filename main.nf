@@ -423,6 +423,27 @@ process run_autogvp {
     """
 }
 
+process multiqc {
+    tag "QC Report"
+    container 'quay.io/biocontainers/multiqc:1.21--pyhdfd78af_0'
+    publishDir 'results/multiqc', mode: 'copy'
+
+    input:
+    path('*')
+
+    output:
+    path "multiqc_report.html"
+    path "multiqc_data"
+
+    script:
+    """
+    multiqc . \
+        --title "PedigreeVarFlow QC Report" \
+        --filename multiqc_report.html \
+        --force
+    """
+}
+
 workflow {
     Channel.fromPath(params.samplesheet)
         .splitCsv(header: true)
@@ -528,5 +549,13 @@ workflow {
         .filter { it != null }
 
     run_autogvp(grouped, clinvar_channel)
+
+    // Collect QC outputs for MultiQC report
+    stats_channel
+        .map { sample, stats -> stats }
+        .collect()
+        .set { qc_files }
+
+    multiqc(qc_files)
 
 }
