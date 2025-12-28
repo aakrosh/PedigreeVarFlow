@@ -259,7 +259,9 @@ process align_fastq {
     // Split resources: more CPUs to BWA (bottleneck), rest to sort
     def bwa_threads = Math.max(1, task.cpus - 4)
     def sort_threads = Math.min(4, Math.max(1, task.cpus - bwa_threads))
-    def sort_mem_gb = Math.max(1, Math.floor(task.memory.toGiga() / sort_threads - 2)).toInteger()
+    // Reserve 50% of memory for samtools sort, leaving headroom for bwa, samblaster, and samtools view
+    def sort_total_mem_gb = Math.floor(task.memory.toGiga() * 0.5).toInteger()
+    def sort_mem_gb = Math.max(1, Math.floor(sort_total_mem_gb / sort_threads)).toInteger()
     def sort_mem = "${sort_mem_gb}G"
 
     """
