@@ -355,7 +355,7 @@ process filter_variants {
 
 process calculate_variant_stats {
     tag "variant stats"
-    container "openjdk:21-jdk"
+    container "openjdk:21-ea-jdk"
     publishDir 'results', mode: 'copy'
 
     input:
