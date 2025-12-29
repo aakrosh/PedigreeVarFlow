@@ -283,19 +283,30 @@ process align_fastq {
 
 process get_stats {
     tag "${sample}"
-    container "aakrosh/bwa-suite:alpine" 
-    publishDir 'results', mode: 'copy'
+    container "aakrosh/bwa-suite:alpine"
+    publishDir 'results/qc', mode: 'copy', pattern: '*.txt'
 
     input:
-    tuple val(sample), path(bam), path(bai) 
+    tuple val(sample), path(bam), path(bai)
 
     output:
-    tuple val(sample), path("${sample}.stats.txt") 
+    tuple val(sample), path("${sample}.alignstats.txt"), path("${sample}.samtools.stats.txt")
 
     script:
     """
-    alignstats -i ${bam} -o ${sample}.stats.txt -p -W -P ${task.cpus} \
+    set -euo pipefail
+
+    # Generate alignstats for custom target coverage metrics
+    # Provides detailed capture/target-specific statistics
+    alignstats -i ${bam} -o ${sample}.alignstats.txt -p -W -P ${task.cpus} \
         -t ${params.target_regions}
+
+    # Generate samtools stats for MultiQC-compatible metrics
+    # Includes alignment summary, insert sizes, mapping quality, and GC content
+    samtools stats -@ ${task.cpus} \
+        -r ${params.reference} \
+        -t ${params.target_regions} \
+        ${bam} > ${sample}.samtools.stats.txt
     """
 }
 
@@ -813,7 +824,7 @@ workflow {
 
     // Collect QC outputs for MultiQC report
     stats_channel
-        .map { sample, stats -> stats }
+        .map { sample, alignstats, samtools_stats -> samtools_stats }
         .collect()
         .set { qc_files }
 
