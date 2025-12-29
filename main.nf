@@ -355,7 +355,7 @@ process filter_variants {
 
 process calculate_variant_stats {
     tag "variant stats"
-    container "openjdk:21-ea-jdk"
+    container "eclipse-temurin:21-jdk"
     publishDir 'results', mode: 'copy'
 
     input:
@@ -392,7 +392,44 @@ process leftalign_split {
 
 process prioritize_variants {
     tag "exomiser_prioritisation"
-    container "openjdk:21-jdk"
+    container "eclipse-temurin:21-jdk"
+    publishDir 'results', mode: 'copy'
+
+    input:
+    tuple path(vcf), path(tbi)
+    path(pedigree_file)
+
+    output:
+    path("variant_qc.html")
+
+    script:
+    """
+    java -jar ${params.variantqc_jar} VariantQC -R ${params.reference} \
+        -ped ${pedigree_file} -V ${vcf} -O variant_qc.html
+    """
+}
+
+process leftalign_split {
+    tag "standardize"
+    container "community.wave.seqera.io/library/bcftools:1.21--4335bec1d7b44d11"
+    publishDir 'results', mode: 'copy'    
+
+    input:
+    tuple path(vcf), path(tbi)
+
+    output:
+    path("${vcf.baseName}.norm.vcf")
+
+    script:
+    """
+    bcftools norm -a -d all -f ${params.reference} -m -both -Ov ${vcf} \
+    | bcftools view --trim-alt-alleles -Ov -o ${vcf.baseName}.norm.vcf
+    """
+}
+
+process prioritize_variants {
+    tag "exomiser_prioritisation"
+    container "
     publishDir 'results', mode: 'copy'
     
     input:
